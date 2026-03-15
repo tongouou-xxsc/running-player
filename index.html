@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跑步有声书播放器</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  background: #f5f5f0;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.player {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+}
+h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.drop-zone {
+  border: 1.5px dashed #ccc;
+  border-radius: 14px;
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-bottom: 1.5rem;
+}
+.drop-zone:hover, .drop-zone.drag-over { background: #f9f9f6; border-color: #999; }
+.drop-zone .icon { font-size: 32px; margin-bottom: 8px; }
+.drop-zone p { font-size: 14px; color: #666; }
+.drop-zone p strong { color: #111; }
+#file-input { display: none; }
+.controls { display: none; flex-direction: column; gap: 1.25rem; }
+.controls.visible { display: flex; }
+.track-info { border-radius: 10px; background: #f5f5f0; padding: 12px 14px; }
+.track-title { font-size: 15px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-meta { font-size: 12px; color: #888; margin-top: 3px; }
+.progress-bar {
+  width: 100%; height: 4px; background: #e0e0e0;
+  border-radius: 2px; cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: #111; cursor: pointer;
+}
+.time-row { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 5px; }
+.play-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.btn-play {
+  width: 58px; height: 58px; border-radius: 50%;
+  border: none; background: #111; color: #fff;
+  font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s, background 0.1s;
+}
+.btn-play:active { transform: scale(0.95); }
+.btn-skip {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid #ddd; background: transparent;
+  font-size: 12px; cursor: pointer; color: #666;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-skip:hover { background: #f5f5f0; }
+.section-label {
+  font-size: 11px; font-weight: 600; color: #999;
+  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px;
+}
+.speed-row { display: flex; gap: 6px; }
+.speed-btn {
+  flex: 1; padding: 8px 0; border-radius: 10px;
+  border: 1px solid #e0e0e0; background: transparent;
+  font-size: 13px; cursor: pointer; color: #666;
+  font-family: inherit; transition: background 0.1s;
+}
+.speed-btn:hover { background: #f5f5f0; }
+.speed-btn.active { background: #111; color: #fff; border-color: #111; font-weight: 600; }
+.cadence-display { text-align: center; margin-bottom: 12px; }
+.cadence-num { font-size: 52px; font-weight: 700; color: #111; line-height: 1; letter-spacing: -0.02em; }
+.cadence-unit { font-size: 13px; color: #888; margin-top: 4px; }
+.cadence-slider {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  height: 4px; background: #e0e0e0; border-radius: 2px; cursor: pointer;
+}
+.cadence-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 24px; height: 24px;
+  border-radius: 50%; background: #111; cursor: pointer;
+}
+.cadence-presets { display: flex; gap: 6px; margin-top: 10px; }
+.preset-btn {
+  flex: 1; padding: 7px 0; border-radius: 10px;
+  border: 1px solid #e0e0e0; background: transparent;
+  font-size: 13px; cursor: pointer; color: #666; font-family: inherit;
+}
+.preset-btn:hover { background: #f5f5f0; }
+.preset-btn.active { background: #111; color: #fff; border-color: #111; font-weight: 600; }
+.vol-row { display: flex; align-items: center; gap: 10px; }
+.vol-row label { font-size: 13px; color: #666; min-width: 36px; }
+.vol-row input[type=range] { flex: 1; }
+.vol-val { font-size: 13px; font-weight: 600; min-width: 36px; text-align: right; color: #111; }
+.beat-vis { display: flex; gap: 6px; justify-content: center; padding: 8px 0 0; }
+.beat-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #ddd;
+  transition: background 0.04s, transform 0.04s;
+}
+.beat-dot.active { background: #111; transform: scale(1.6); }
+.footer { text-align: center; font-size: 12px; color: #bbb; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="player">
+  <h1>🏃 跑步有声书播放器</h1>
+
+  <div class="drop-zone" id="drop-zone">
+    <div class="icon">🎧</div>
+    <p><strong>点击选择音频文件</strong></p>
+    <p style="margin-top:4px;">M4B · MP3 · WAV · M4A</p>
+    <input type="file" id="file-input" accept=".m4b,.mp3,.wav,.m4a,audio/*">
+  </div>
+
+  <div class="controls" id="controls">
+    <div class="track-info">
+      <div class="track-title" id="track-title">—</div>
+      <div class="track-meta" id="track-meta">准备就绪</div>
+    </div>
+
+    <div>
+      <input type="range" class="progress-bar" id="progress" min="0" max="100" value="0" step="0.1">
+      <div class="time-row">
+        <span id="time-cur">0:00</span>
+        <span id="time-dur">0:00</span>
+      </div>
+    </div>
+
+    <div class="play-row">
+      <button class="btn-skip" id="btn-back">⟨15</button>
+      <button class="btn-play" id="btn-play">▶</button>
+      <button class="btn-skip" id="btn-fwd">15⟩</button>
+    </div>
+
+    <div>
+      <div class="section-label">播放速度</div>
+      <div class="speed-row">
+        <button class="speed-btn" data-speed="0.75">0.75×</button>
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="1.25">1.25×</button>
+        <button class="speed-btn" data-speed="1.5">1.5×</button>
+        <button class="speed-btn" data-speed="2">2×</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">跑步节拍器</div>
+      <div class="cadence-display">
+        <div class="cadence-num" id="cadence-num">180</div>
+        <div class="cadence-unit">步 / 分钟</div>
+      </div>
+      <input type="range" class="cadence-slider" id="cadence" min="160" max="200" value="180" step="1">
+      <div class="cadence-presets">
+        <button class="preset-btn" data-bpm="170">170</button>
+        <button class="preset-btn active" data-bpm="180">180</button>
+        <button class="preset-btn" data-bpm="185">185</button>
+        <button class="preset-btn" data-bpm="190">190</button>
+        <button class="preset-btn" data-bpm="200">200</button>
+      </div>
+      <div class="beat-vis">
+        <div class="beat-dot"></div><div class="beat-dot"></div>
+        <div class="beat-dot"></div><div class="beat-dot"></div>
+        <div class="beat-dot"></div><div class="beat-dot"></div>
+        <div class="beat-dot"></div><div class="beat-dot"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">节拍音量</div>
+      <div class="vol-row">
+        <label>轻 → 响</label>
+        <input type="range" id="metro-vol" min="0" max="100" value="25" step="1">
+        <span class="vol-val" id="vol-val">25%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">文件仅在本地处理，不上传任何服务器</div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const controls = document.getElementById('controls');
+const trackTitle = document.getElementById('track-title');
+const progressBar = document.getElementById('progress');
+const timeCur = document.getElementById('time-cur');
+const timeDur = document.getElementById('time-dur');
+const btnPlay = document.getElementById('btn-play');
+const cadenceSlider = document.getElementById('cadence');
+const cadenceNum = document.getElementById('cadence-num');
+const volSlider = document.getElementById('metro-vol');
+const volVal = document.getElementById('vol-val');
+
+let audioCtx, audioSrc, gainNode, metroGain, audioEl;
+let metroTimer = null;
+let nextBeatTime = 0;
+let beatIdx = 0;
+let bpm = 180;
+let playbackRate = 1;
+let isPlaying = false;
+
+function fmt(s) {
+  s = Math.floor(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  return m + ':' + String(sec).padStart(2,'0');
+}
+
+function flashDot(idx) {
+  const dots = document.querySelectorAll('.beat-dot');
+  dots.forEach(d => d.classList.remove('active'));
+  dots[idx % dots.length] && dots[idx % dots.length].classList.add('active');
+  setTimeout(() => dots.forEach(d => d.classList.remove('active')), 70);
+}
+
+function scheduleClick(when, idx) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const env = audioCtx.createGain();
+  osc.connect(env); env.connect(metroGain);
+  osc.frequency.value = idx % 2 === 0 ? 1100 : 900;
+  env.gain.setValueAtTime(0.9, when);
+  env.gain.exponentialRampToValueAtTime(0.001, when + 0.035);
+  osc.start(when); osc.stop(when + 0.04);
+  const delay = (when - audioCtx.currentTime) * 1000;
+  setTimeout(() => flashDot(idx), Math.max(0, delay));
+}
+
+function schedulerLoop() {
+  if (!audioCtx || !isPlaying) return;
+  const interval = 60 / bpm;
+  while (nextBeatTime < audioCtx.currentTime + 0.1) {
+    scheduleClick(nextBeatTime, beatIdx);
+    nextBeatTime += interval;
+    beatIdx++;
+  }
+  metroTimer = setTimeout(schedulerLoop, 25);
+}
+
+function startMetro() {
+  clearTimeout(metroTimer);
+  nextBeatTime = audioCtx.currentTime + 0.05;
+  beatIdx = 0;
+  schedulerLoop();
+}
+
+function stopMetro() {
+  clearTimeout(metroTimer);
+  document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('active'));
+}
+
+function loadFile(file) {
+  if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+  if (audioCtx) audioCtx.close();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  metroGain = audioCtx.createGain();
+  metroGain.gain.value = parseFloat(volSlider.value) / 100;
+  metroGain.connect(audioCtx.destination);
+  gainNode = audioCtx.createGain();
+  gainNode.connect(audioCtx.destination);
+  audioEl = new Audio();
+  audioEl.src = URL.createObjectURL(file);
+  audioEl.crossOrigin = 'anonymous';
+  audioEl.playbackRate = playbackRate;
+  audioSrc = audioCtx.createMediaElementSource(audioEl);
+  audioSrc.connect(gainNode);
+  trackTitle.textContent = file.name.replace(/\.[^.]+$/, '');
+  controls.classList.add('visible');
+  dropZone.style.display = 'none';
+  audioEl.addEventListener('loadedmetadata', () => {
+    timeDur.textContent = fmt(audioEl.duration);
+    progressBar.max = audioEl.duration;
+  });
+  audioEl.addEventListener('timeupdate', () => {
+    timeCur.textContent = fmt(audioEl.currentTime);
+    progressBar.value = audioEl.currentTime;
+  });
+  audioEl.addEventListener('ended', () => {
+    isPlaying = false; btnPlay.textContent = '▶'; stopMetro();
+  });
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+btnPlay.addEventListener('click', () => {
+  if (!audioEl) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (isPlaying) {
+    audioEl.pause(); isPlaying = false; btnPlay.textContent = '▶'; stopMetro();
+  } else {
+    audioEl.play(); isPlaying = true; btnPlay.textContent = '⏸'; startMetro();
+  }
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  if (audioEl) audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
+});
+document.getElementById('btn-fwd').addEventListener('click', () => {
+  if (audioEl) audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
+});
+
+progressBar.addEventListener('input', () => {
+  if (audioEl) {
+    audioEl.currentTime = parseFloat(progressBar.value);
+    if (isPlaying) { stopMetro(); startMetro(); }
+  }
+});
+
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    playbackRate = parseFloat(btn.dataset.speed);
+    if (audioEl) audioEl.playbackRate = playbackRate;
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (isPlaying) { stopMetro(); startMetro(); }
+  });
+});
+
+function setBpm(val) {
+  bpm = val;
+  cadenceNum.textContent = bpm;
+  cadenceSlider.value = bpm;
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.bpm) === bpm);
+  });
+  if (isPlaying) { stopMetro(); startMetro(); }
+}
+
+cadenceSlider.addEventListener('input', () => setBpm(parseInt(cadenceSlider.value)));
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => setBpm(parseInt(btn.dataset.bpm)));
+});
+
+volSlider.addEventListener('input', () => {
+  const v = parseInt(volSlider.value);
+  volVal.textContent = v + '%';
+  if (metroGain) metroGain.gain.value = v / 100;
+});
+</script>
+</body>
+</html>
