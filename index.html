@@ -2,155 +2,418 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>跑步有声书播放器</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RUNCAST</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --accent: #e8ff00;
+  --accent2: #ff4d00;
+  --text: #ffffff;
+  --muted: #555;
+  --muted2: #333;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-  background: #f5f5f0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
   min-height: 100vh;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 2rem 1rem;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  overflow-x: hidden;
 }
-.player {
+
+/* background grid lines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(232,255,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,255,0,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
   width: 100%;
-  max-width: 400px;
-  background: #fff;
-  border-radius: 20px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+  max-width: 420px;
+  padding: 0 0 3rem;
+  position: relative;
+  z-index: 1;
 }
-h1 {
-  font-size: 16px;
+
+/* HEADER */
+.header {
+  padding: 2rem 1.5rem 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 32px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.logo-sub {
+  font-size: 11px;
   font-weight: 600;
-  color: #111;
-  margin-bottom: 1.25rem;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
 }
+
+/* DROP ZONE */
 .drop-zone {
-  border: 1.5px dashed #ccc;
-  border-radius: 14px;
-  padding: 2rem 1rem;
+  margin: 0 1.5rem 1.5rem;
+  border: 1.5px dashed var(--muted);
+  border-radius: 4px;
+  padding: 2.5rem 1rem;
   text-align: center;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.drop-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(232,255,0,0.0) 0%, rgba(232,255,0,0.04) 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+}
+.drop-zone:hover::before, .drop-zone.drag-over::before { opacity: 1; }
+.drop-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  display: block;
+}
+.drop-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--text);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.drop-sub {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+#file-input { display: none; }
+
+/* CONTROLS */
+.controls { display: none; flex-direction: column; }
+.controls.visible { display: flex; }
+
+/* TRACK STRIP */
+.track-strip {
+  background: var(--surface2);
+  border-top: 2px solid var(--accent);
+  padding: 14px 1.5rem;
   margin-bottom: 1.5rem;
 }
-.drop-zone:hover, .drop-zone.drag-over { background: #f9f9f6; border-color: #999; }
-.drop-zone .icon { font-size: 32px; margin-bottom: 8px; }
-.drop-zone p { font-size: 14px; color: #666; }
-.drop-zone p strong { color: #111; }
-#file-input { display: none; }
-.controls { display: none; flex-direction: column; gap: 1.25rem; }
-.controls.visible { display: flex; }
-.track-info { border-radius: 10px; background: #f5f5f0; padding: 12px 14px; }
-.track-title { font-size: 15px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.track-meta { font-size: 12px; color: #888; margin-top: 3px; }
+.track-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.track-format {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* PROGRESS */
+.progress-section { padding: 0 1.5rem 1.5rem; }
+.progress-wrap {
+  position: relative;
+  height: 4px;
+  background: var(--muted2);
+  border-radius: 0;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.progress-fill {
+  position: absolute;
+  left: 0; top: 0; height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
 .progress-bar {
-  width: 100%; height: 4px; background: #e0e0e0;
-  border-radius: 2px; cursor: pointer; appearance: none; -webkit-appearance: none;
+  position: absolute;
+  inset: -8px 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
-.progress-bar::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px;
-  border-radius: 50%; background: #111; cursor: pointer;
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
 }
-.time-row { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 5px; }
-.play-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
-.btn-play {
-  width: 58px; height: 58px; border-radius: 50%;
-  border: none; background: #111; color: #fff;
-  font-size: 22px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: transform 0.1s, background 0.1s;
+
+/* PLAY CONTROLS */
+.play-section {
+  padding: 0 1.5rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.btn-play:active { transform: scale(0.95); }
 .btn-skip {
-  width: 40px; height: 40px; border-radius: 50%;
-  border: 1px solid #ddd; background: transparent;
-  font-size: 12px; cursor: pointer; color: #666;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
   display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
 }
-.btn-skip:hover { background: #f5f5f0; }
+.btn-skip:hover { border-color: var(--accent); color: var(--accent); }
+.btn-play {
+  flex: 1;
+  height: 54px;
+  border: none;
+  background: var(--accent);
+  color: #000;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.1s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-play:active { transform: scale(0.98); }
+.btn-play.playing { background: var(--surface2); color: var(--accent); border: 1.5px solid var(--accent); }
+
+/* SPEED */
+.section { padding: 0 1.5rem 1.5rem; }
 .section-label {
-  font-size: 11px; font-weight: 600; color: #999;
-  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
 }
 .speed-row { display: flex; gap: 6px; }
 .speed-btn {
-  flex: 1; padding: 8px 0; border-radius: 10px;
-  border: 1px solid #e0e0e0; background: transparent;
-  font-size: 13px; cursor: pointer; color: #666;
-  font-family: inherit; transition: background 0.1s;
+  flex: 1; height: 36px;
+  border: 1.5px solid var(--muted2);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
 }
-.speed-btn:hover { background: #f5f5f0; }
-.speed-btn.active { background: #111; color: #fff; border-color: #111; font-weight: 600; }
-.cadence-display { text-align: center; margin-bottom: 12px; }
-.cadence-num { font-size: 52px; font-weight: 700; color: #111; line-height: 1; letter-spacing: -0.02em; }
-.cadence-unit { font-size: 13px; color: #888; margin-top: 4px; }
-.cadence-slider {
-  width: 100%; appearance: none; -webkit-appearance: none;
-  height: 4px; background: #e0e0e0; border-radius: 2px; cursor: pointer;
+.speed-btn:hover { border-color: var(--accent); color: var(--accent); }
+.speed-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+/* CADENCE */
+.cadence-card {
+  margin: 0 1.5rem 1.5rem;
+  border: 1.5px solid var(--muted2);
+  border-radius: 2px;
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
 }
-.cadence-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 24px; height: 24px;
-  border-radius: 50%; background: #111; cursor: pointer;
+.cadence-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
 }
-.cadence-presets { display: flex; gap: 6px; margin-top: 10px; }
-.preset-btn {
-  flex: 1; padding: 7px 0; border-radius: 10px;
-  border: 1px solid #e0e0e0; background: transparent;
-  font-size: 13px; cursor: pointer; color: #666; font-family: inherit;
+.cadence-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
-.preset-btn:hover { background: #f5f5f0; }
-.preset-btn.active { background: #111; color: #fff; border-color: #111; font-weight: 600; }
-.vol-row { display: flex; align-items: center; gap: 10px; }
-.vol-row label { font-size: 13px; color: #666; min-width: 36px; }
-.vol-row input[type=range] { flex: 1; }
-.vol-val { font-size: 13px; font-weight: 600; min-width: 36px; text-align: right; color: #111; }
-.beat-vis { display: flex; gap: 6px; justify-content: center; padding: 8px 0 0; }
+.cadence-big {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 72px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  transition: color 0.15s;
+}
+.cadence-right { text-align: right; }
+.cadence-unit {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.beat-vis { display: flex; gap: 5px; justify-content: flex-end; }
 .beat-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #ddd;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted2);
   transition: background 0.04s, transform 0.04s;
 }
-.beat-dot.active { background: #111; transform: scale(1.6); }
-.footer { text-align: center; font-size: 12px; color: #bbb; margin-top: 1.5rem; }
+.beat-dot.active { background: var(--accent); transform: scale(1.7); }
+.beat-dot.accent { }
+
+.cadence-slider {
+  width: 100%;
+  appearance: none; -webkit-appearance: none;
+  height: 2px;
+  background: var(--muted2);
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.cadence-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(232,255,0,0.15);
+}
+.preset-row { display: flex; gap: 6px; }
+.preset-btn {
+  flex: 1; height: 34px;
+  border: 1.5px solid var(--muted2);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+.preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+.preset-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+/* VOLUME */
+.vol-row { display: flex; align-items: center; gap: 12px; }
+.vol-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; min-width: 16px; font-family: 'Barlow Condensed', sans-serif; }
+.vol-slider {
+  flex: 1;
+  appearance: none; -webkit-appearance: none;
+  height: 2px; background: var(--muted2); cursor: pointer;
+}
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%; background: var(--text); cursor: pointer;
+}
+.vol-val { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; color: var(--text); min-width: 36px; text-align: right; letter-spacing: 0.05em; }
+
+/* DIVIDER */
+.divider { height: 1px; background: var(--muted2); margin: 0 1.5rem 1.5rem; }
+
+/* FOOTER */
+.footer {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 0 1.5rem;
+  text-transform: uppercase;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(232,255,0,0.4); }
+  70% { box-shadow: 0 0 0 12px rgba(232,255,0,0); }
+  100% { box-shadow: 0 0 0 0 rgba(232,255,0,0); }
+}
+.btn-play.playing { animation: none; }
 </style>
 </head>
 <body>
-<div class="player">
-  <h1>🏃 跑步有声书播放器</h1>
+<div class="app">
+  <div class="header">
+    <div class="logo">RUNCAST</div>
+    <div class="logo-sub">跑步有声书</div>
+  </div>
 
   <div class="drop-zone" id="drop-zone">
-    <div class="icon">🎧</div>
-    <p><strong>点击选择音频文件</strong></p>
-    <p style="margin-top:4px;">M4B · MP3 · WAV · M4A</p>
+    <span class="drop-icon">🎧</span>
+    <div class="drop-title">加载音频文件</div>
+    <div class="drop-sub">M4B &nbsp;·&nbsp; MP3 &nbsp;·&nbsp; WAV &nbsp;·&nbsp; M4A</div>
     <input type="file" id="file-input" accept=".m4b,.mp3,.wav,.m4a,audio/*">
   </div>
 
   <div class="controls" id="controls">
-    <div class="track-info">
-      <div class="track-title" id="track-title">—</div>
-      <div class="track-meta" id="track-meta">准备就绪</div>
+
+    <div class="track-strip">
+      <div class="track-name" id="track-title">—</div>
+      <div class="track-format" id="track-format">—</div>
     </div>
 
-    <div>
-      <input type="range" class="progress-bar" id="progress" min="0" max="100" value="0" step="0.1">
+    <div class="progress-section">
+      <div class="progress-wrap">
+        <div class="progress-fill" id="progress-fill"></div>
+        <input type="range" class="progress-bar" id="progress" min="0" max="100" value="0" step="0.1">
+      </div>
       <div class="time-row">
         <span id="time-cur">0:00</span>
         <span id="time-dur">0:00</span>
       </div>
     </div>
 
-    <div class="play-row">
-      <button class="btn-skip" id="btn-back">⟨15</button>
-      <button class="btn-play" id="btn-play">▶</button>
-      <button class="btn-skip" id="btn-fwd">15⟩</button>
+    <div class="play-section">
+      <button class="btn-skip" id="btn-back">−15</button>
+      <button class="btn-play" id="btn-play">▶ &nbsp;PLAY</button>
+      <button class="btn-skip" id="btn-fwd">+15</button>
     </div>
 
-    <div>
+    <div class="section">
       <div class="section-label">播放速度</div>
       <div class="speed-row">
         <button class="speed-btn" data-speed="0.75">0.75×</button>
@@ -161,39 +424,42 @@ h1 {
       </div>
     </div>
 
-    <div>
-      <div class="section-label">跑步节拍器</div>
-      <div class="cadence-display">
-        <div class="cadence-num" id="cadence-num">180</div>
-        <div class="cadence-unit">步 / 分钟</div>
+    <div class="cadence-card">
+      <div class="cadence-top">
+        <div class="cadence-big" id="cadence-num">180</div>
+        <div class="cadence-right">
+          <div class="cadence-unit">步 / 分钟</div>
+          <div class="beat-vis">
+            <div class="beat-dot"></div><div class="beat-dot"></div>
+            <div class="beat-dot"></div><div class="beat-dot"></div>
+            <div class="beat-dot"></div><div class="beat-dot"></div>
+            <div class="beat-dot"></div><div class="beat-dot"></div>
+          </div>
+        </div>
       </div>
       <input type="range" class="cadence-slider" id="cadence" min="160" max="200" value="180" step="1">
-      <div class="cadence-presets">
+      <div class="preset-row">
         <button class="preset-btn" data-bpm="170">170</button>
         <button class="preset-btn active" data-bpm="180">180</button>
         <button class="preset-btn" data-bpm="185">185</button>
         <button class="preset-btn" data-bpm="190">190</button>
         <button class="preset-btn" data-bpm="200">200</button>
       </div>
-      <div class="beat-vis">
-        <div class="beat-dot"></div><div class="beat-dot"></div>
-        <div class="beat-dot"></div><div class="beat-dot"></div>
-        <div class="beat-dot"></div><div class="beat-dot"></div>
-        <div class="beat-dot"></div><div class="beat-dot"></div>
-      </div>
     </div>
 
-    <div>
+    <div class="section">
       <div class="section-label">节拍音量</div>
       <div class="vol-row">
-        <label>轻 → 响</label>
-        <input type="range" id="metro-vol" min="0" max="100" value="25" step="1">
+        <span class="vol-label">弱</span>
+        <input type="range" class="vol-slider" id="metro-vol" min="0" max="100" value="25" step="1">
+        <span class="vol-label">强</span>
         <span class="vol-val" id="vol-val">25%</span>
       </div>
     </div>
-  </div>
 
-  <div class="footer">文件仅在本地处理，不上传任何服务器</div>
+    <div class="divider"></div>
+    <div class="footer">文件仅在本地处理 · 不上传服务器</div>
+  </div>
 </div>
 
 <script>
@@ -201,7 +467,9 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const controls = document.getElementById('controls');
 const trackTitle = document.getElementById('track-title');
+const trackFormat = document.getElementById('track-format');
 const progressBar = document.getElementById('progress');
+const progressFill = document.getElementById('progress-fill');
 const timeCur = document.getElementById('time-cur');
 const timeDur = document.getElementById('time-dur');
 const btnPlay = document.getElementById('btn-play');
@@ -220,9 +488,9 @@ let isPlaying = false;
 
 function fmt(s) {
   s = Math.floor(s);
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
-  return m + ':' + String(sec).padStart(2,'0');
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h > 0) return h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  return m+':'+String(sec).padStart(2,'0');
 }
 
 function flashDot(idx) {
@@ -237,10 +505,10 @@ function scheduleClick(when, idx) {
   const osc = audioCtx.createOscillator();
   const env = audioCtx.createGain();
   osc.connect(env); env.connect(metroGain);
-  osc.frequency.value = idx % 2 === 0 ? 1100 : 900;
-  env.gain.setValueAtTime(0.9, when);
-  env.gain.exponentialRampToValueAtTime(0.001, when + 0.035);
-  osc.start(when); osc.stop(when + 0.04);
+  osc.frequency.value = idx % 2 === 0 ? 1100 : 880;
+  env.gain.setValueAtTime(1, when);
+  env.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+  osc.start(when); osc.stop(when + 0.045);
   const delay = (when - audioCtx.currentTime) * 1000;
   setTimeout(() => flashDot(idx), Math.max(0, delay));
 }
@@ -283,7 +551,9 @@ function loadFile(file) {
   audioEl.playbackRate = playbackRate;
   audioSrc = audioCtx.createMediaElementSource(audioEl);
   audioSrc.connect(gainNode);
+  const ext = file.name.split('.').pop().toUpperCase();
   trackTitle.textContent = file.name.replace(/\.[^.]+$/, '');
+  trackFormat.textContent = ext + ' · 准备就绪';
   controls.classList.add('visible');
   dropZone.style.display = 'none';
   audioEl.addEventListener('loadedmetadata', () => {
@@ -292,10 +562,15 @@ function loadFile(file) {
   });
   audioEl.addEventListener('timeupdate', () => {
     timeCur.textContent = fmt(audioEl.currentTime);
+    const pct = audioEl.duration ? (audioEl.currentTime / audioEl.duration * 100) : 0;
+    progressFill.style.width = pct + '%';
     progressBar.value = audioEl.currentTime;
   });
   audioEl.addEventListener('ended', () => {
-    isPlaying = false; btnPlay.textContent = '▶'; stopMetro();
+    isPlaying = false;
+    btnPlay.textContent = '▶  PLAY';
+    btnPlay.classList.remove('playing');
+    stopMetro();
   });
 }
 
@@ -312,9 +587,15 @@ btnPlay.addEventListener('click', () => {
   if (!audioEl) return;
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (isPlaying) {
-    audioEl.pause(); isPlaying = false; btnPlay.textContent = '▶'; stopMetro();
+    audioEl.pause(); isPlaying = false;
+    btnPlay.innerHTML = '▶ &nbsp;PLAY';
+    btnPlay.classList.remove('playing');
+    stopMetro();
   } else {
-    audioEl.play(); isPlaying = true; btnPlay.textContent = '⏸'; startMetro();
+    audioEl.play(); isPlaying = true;
+    btnPlay.innerHTML = '⏸ &nbsp;PAUSE';
+    btnPlay.classList.add('playing');
+    startMetro();
   }
 });
 
